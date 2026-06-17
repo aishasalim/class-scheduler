@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export type CohortSummary = {
   id: string;
@@ -166,6 +167,37 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, id, semesters, currentSemester, passwordSet: hasPassword });
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
+
+// Admin-only: delete a cohort and cascade its participants + schedule rows.
+export async function DELETE(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
+  try {
+    await ensureDb();
+    const id = String(request.nextUrl.searchParams.get("id") ?? "").trim().toUpperCase();
+    if (!id) {
+      return NextResponse.json({ error: "Cohort id is required." }, { status: 400 });
+    }
+
+    const existing = await db.execute("SELECT id FROM cohorts WHERE id = ?", [id]);
+    if (existing.rows.length === 0) {
+      return NextResponse.json({ error: `Cohort "${id}" does not exist.` }, { status: 404 });
+    }
+
+    await db.execute(
+      `DELETE FROM schedule_rows WHERE participant_id IN
+         (SELECT id FROM participants WHERE cohort_id = ?)`,
+      [id]
+    );
+    await db.execute("DELETE FROM participants WHERE cohort_id = ?", [id]);
+    await db.execute("DELETE FROM cohorts WHERE id = ?", [id]);
+
+    return NextResponse.json({ ok: true, id });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

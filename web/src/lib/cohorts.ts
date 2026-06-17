@@ -66,3 +66,11 @@ export function getCohort(id: string): Cohort | undefined {
 export function normalizeCohortId(id: string): string {
   return id.toUpperCase();
 }
+
+/**
+ * The extension import password for a cohort. Hardcoded and derived from the
+ * cohort code, e.g. cohort "K" → "cohort-k-superpassword". No per-cohort setup.
+ */
+export function cohortImportPassword(id: string): string {
+  return `cohort-${id.toLowerCase()}-superpassword`;
+}

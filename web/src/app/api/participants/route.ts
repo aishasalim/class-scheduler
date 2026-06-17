@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { normalizeCohortId } from "@/lib/cohorts";
 import { findOrCreateParticipant, slugifyName } from "@/lib/participant-db";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -83,6 +84,55 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ id, cohort_id: cohortId, name, major, gender, birthday, phone });
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
+
+// Admin-only: rename a participant.
+export async function PATCH(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
+  try {
+    await ensureDb();
+    const body = (await request.json().catch(() => ({}))) as { id?: string; name?: string };
+    const id = String(body.id ?? "").trim();
+    const name = String(body.name ?? "").trim();
+
+    if (!id) return NextResponse.json({ error: "Participant id is required." }, { status: 400 });
+    if (!name) return NextResponse.json({ error: "Name is required." }, { status: 400 });
+
+    const existing = await db.execute("SELECT id FROM participants WHERE id = ?", [id]);
+    if (existing.rows.length === 0) {
+      return NextResponse.json({ error: "Participant does not exist." }, { status: 404 });
+    }
+
+    await db.execute("UPDATE participants SET name = ? WHERE id = ?", [name, id]);
+    return NextResponse.json({ ok: true, id, name });
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
+
+// Admin-only: delete a participant and their schedule rows.
+export async function DELETE(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
+  try {
+    await ensureDb();
+    const id = String(request.nextUrl.searchParams.get("id") ?? "").trim();
+    if (!id) return NextResponse.json({ error: "Participant id is required." }, { status: 400 });
+
+    const existing = await db.execute("SELECT id FROM participants WHERE id = ?", [id]);
+    if (existing.rows.length === 0) {
+      return NextResponse.json({ error: "Participant does not exist." }, { status: 404 });
+    }
+
+    await db.execute("DELETE FROM schedule_rows WHERE participant_id = ?", [id]);
+    await db.execute("DELETE FROM participants WHERE id = ?", [id]);
+    return NextResponse.json({ ok: true, id });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

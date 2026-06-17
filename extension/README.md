@@ -17,13 +17,14 @@ extension/
 
 ## Student setup (one time)
 
-1. **Facilitator** creates the cohort in the web app and sets an **import password**
-   (landing page “Add cohort” or cohort login page → “Extension import password”).
+1. **Facilitator** creates the cohort in the web app (landing page → “Add cohort”,
+   or the admin dashboard). The **import password is automatic**: `cohort-<code>-superpassword`
+   (e.g. cohort `K` → `cohort-k-superpassword`).
 2. **Install the extension** (see below).
 3. Click the extension icon and enter:
    - **Full name** (must match how you appear in the cohort roster)
    - **Cohort code** (e.g. `K`, `J`)
-   - **Cohort password** (from your facilitator)
+   - **Cohort password** (`cohort-<code>-superpassword`)
 4. Open **Aggie Schedule Builder** (or the bundled mock page for testing).
 5. Click **Import my schedule**.
 6. After import, use **Movable / Unmovable** toggles per class. Each toggle
@@ -41,10 +42,10 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-### 2. Set a cohort password
+### 2. Note the cohort import password
 
 - Open http://localhost:3000 → pick cohort **K** (or create one).
-- On the cohort login page, set **Extension import password** (e.g. `demo123`).
+- The import password is **automatic**: `cohort-<code>-superpassword`. For cohort K that's `cohort-k-superpassword`. Nothing to set up.
 
 ### 3. Load the extension (unpacked) in Chrome
 
@@ -55,7 +56,7 @@ npm run dev          # http://localhost:3000
 
 ### 4. Configure & import
 
-1. Extension popup → enter your name, cohort `K`, password `demo123` → **Save**.
+1. Extension popup → enter your name, cohort `K`, password `cohort-k-superpassword` → **Save**.
 2. Open `extension/mock/aggie-schedule-builder.html` in Chrome.
 3. **Import my schedule** → you should see saved classes and priority toggles.
 4. In the web app, open the cohort workspace — your schedule should appear under your name.
@@ -63,13 +64,12 @@ npm run dev          # http://localhost:3000
 ### Verify with curl (no browser)
 
 ```bash
-# Set password first via PATCH /api/cohorts or the facilitator UI, then:
 curl -s -X POST http://localhost:3000/api/actions/import \
   -H 'Content-Type: application/json' \
   -d '{
     "cohortId":"K",
     "fullName":"Test Student",
-    "password":"demo123",
+    "password":"cohort-k-superpassword",
     "meetings":[{"subject":"CSCE","number":"313","days":"TR","start":"12:45","end":"14:00","duration":75,"meetingType":"lecture"}]
   }'
 ```
@@ -92,7 +92,7 @@ Aggie Schedule Builder page
 - **One POST** from the extension handles auth, participant upsert, normalization,
   priority, and DB save.
 - **CORS** is enabled on the import endpoint for cross-origin extension calls.
-- **GET /api/cohorts** never returns passwords; facilitators set them via POST/PATCH.
+- The import password is **hardcoded per cohort** (`cohort-<code>-superpassword`) — there is no password to set or store.
 
 ## Adapting to the real Aggie Schedule Builder
 
@@ -108,7 +108,7 @@ Edit **`config.js`** only:
 {
   "cohortId": "K",
   "fullName": "Jane Doe",
-  "password": "cohort-secret",
+  "password": "cohort-k-superpassword",
   "priorities": { "CSCE 313": "unmovable", "MATH 251": "movable" },
   "meetings": [
     { "subject": "CSCE", "number": "313", "days": "TR", "start": "12:45", "end": "14:00", "duration": 75, "meetingType": "lecture" }

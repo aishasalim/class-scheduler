@@ -41,10 +41,6 @@ export default function CohortLoginPage() {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
   const [savingSemester, setSavingSemester] = useState(false);
-  const [cohortPassword, setCohortPassword] = useState("");
-  const [passwordDraft, setPasswordDraft] = useState("");
-  const [savingPassword, setSavingPassword] = useState(false);
-  const [passwordMessage, setPasswordMessage] = useState("");
 
   const loadParticipants = useCallback(async () => {
     const res = await fetch(`/api/participants?cohort=${cohortId}`);
@@ -137,26 +133,6 @@ export default function CohortLoginPage() {
     },
     [cohortId]
   );
-
-  const savePassword = useCallback(async () => {
-    setSavingPassword(true);
-    setPasswordMessage("");
-    try {
-      const res = await fetch("/api/cohorts", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: cohortId, password: passwordDraft.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not save password");
-      setCohortPassword(passwordDraft.trim());
-      setPasswordMessage("Import password saved.");
-    } catch (e) {
-      setPasswordMessage(e instanceof Error ? e.message : "Could not save password");
-    } finally {
-      setSavingPassword(false);
-    }
-  }, [cohortId, passwordDraft]);
 
   const selectSemester = useCallback(
     (value: string) => {
@@ -271,36 +247,6 @@ export default function CohortLoginPage() {
           <h1 className="text-3xl font-semibold tracking-tight">{cohort?.name ?? `Cohort ${cohortId}`}</h1>
           <p className="text-muted-foreground">Find your name to open your cohort workspace.</p>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Extension import password</CardTitle>
-            <CardDescription>
-              Students enter this once in the Chrome extension to save schedules.
-              {cohortPassword ? " A password is set." : " Not set yet — set one before students import."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Input
-              type="password"
-              placeholder={cohortPassword ? "Enter new password to change" : "Set cohort import password"}
-              value={passwordDraft}
-              onChange={(e) => {
-                setPasswordDraft(e.target.value);
-                setPasswordMessage("");
-              }}
-            />
-            {passwordMessage ? (
-              <p className={`text-sm ${passwordMessage.includes("saved") ? "text-green-600" : "text-destructive"}`}>
-                {passwordMessage}
-              </p>
-            ) : null}
-            <Button size="sm" onClick={() => void savePassword()} disabled={savingPassword || !passwordDraft.trim()}>
-              {savingPassword ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : null}
-              Save password
-            </Button>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>
