@@ -1,0 +1,7 @@
+# macOS
+.DS_Store
+
+# Local AI / editor tooling
+.agents/
+skills-lock.json
+.cursor/

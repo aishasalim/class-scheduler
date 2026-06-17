@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Aggie Schedule Builder — Current Schedule (MOCK)</title>
+    <style>
+      :root { --maroon: #500000; --border: #d4d4d8; --muted: #6b7280; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #1a1a1a;
+        background: #f4f4f5;
+      }
+      header {
+        background: var(--maroon);
+        color: #fff;
+        padding: 14px 24px;
+      }
+      header h1 { font-size: 16px; margin: 0; }
+      header .badge {
+        font-size: 11px;
+        opacity: 0.85;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      main { max-width: 760px; margin: 24px auto; padding: 0 16px; }
+      h2 { font-size: 18px; margin: 0 0 16px; }
+      .course-card {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px 18px;
+        margin-bottom: 14px;
+      }
+      .course-head {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+      .course-code { font-weight: 700; font-size: 15px; color: var(--maroon); }
+      .course-title { color: #111; }
+      .crn { margin-left: auto; font-size: 12px; color: var(--muted); }
+      .meetings { list-style: none; margin: 0; padding: 0; }
+      .meeting {
+        display: grid;
+        grid-template-columns: 80px 56px 1fr 110px;
+        gap: 10px;
+        align-items: center;
+        padding: 6px 0;
+        border-top: 1px dashed #ececef;
+        font-size: 13px;
+      }
+      .meeting:first-child { border-top: none; }
+      .meeting-type {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--muted);
+      }
+      .meeting-days { font-weight: 700; }
+      .meeting-time { font-variant-numeric: tabular-nums; }
+      .meeting-loc { color: var(--muted); text-align: right; }
+      footer { max-width: 760px; margin: 0 auto 40px; padding: 0 16px; color: var(--muted); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="badge">Texas A&amp;M University · Schedule Builder</div>
+      <h1>Aggie Schedule Builder</h1>
+    </header>
+
+    <main>
+      <h2>Current Schedule — Fall 2026</h2>
+
+      <!--
+        This is the structure the extension scrapes (see extension/config.js SELECTORS):
+          #current-schedule  → .course-card → .course-code
+                                            → .meeting → .meeting-days / .meeting-time / .meeting-type
+      -->
+      <section id="current-schedule">
+        <article class="course-card" data-course="CSCE 313">
+          <div class="course-head">
+            <span class="course-code">CSCE 313</span>
+            <span class="course-title">Introduction to Computer Systems</span>
+            <span class="crn">CRN 37713</span>
+          </div>
+          <ul class="meetings">
+            <li class="meeting">
+              <span class="meeting-type">Lecture</span>
+              <span class="meeting-days">TR</span>
+              <span class="meeting-time">12:45pm - 2:00pm</span>
+              <span class="meeting-loc">ZACH 350</span>
+            </li>
+            <li class="meeting">
+              <span class="meeting-type">Lecture</span>
+              <span class="meeting-days">MW</span>
+              <span class="meeting-time">1:50pm - 2:40pm</span>
+              <span class="meeting-loc">ZACH 598</span>
+            </li>
+          </ul>
+        </article>
+
+        <article class="course-card" data-course="MATH 251">
+          <div class="course-head">
+            <span class="course-code">MATH 251</span>
+            <span class="course-title">Engineering Mathematics III</span>
+            <span class="crn">CRN 12045</span>
+          </div>
+          <ul class="meetings">
+            <li class="meeting">
+              <span class="meeting-type">Lecture</span>
+              <span class="meeting-days">MWF</span>
+              <span class="meeting-time">9:10am - 10:00am</span>
+              <span class="meeting-loc">BLOC 117</span>
+            </li>
+          </ul>
+        </article>
+
+        <article class="course-card" data-course="PHYS 207">
+          <div class="course-head">
+            <span class="course-code">PHYS 207</span>
+            <span class="course-title">Electricity and Magnetism</span>
+            <span class="crn">CRN 28860</span>
+          </div>
+          <ul class="meetings">
+            <li class="meeting">
+              <span class="meeting-type">Lecture</span>
+              <span class="meeting-days">TR</span>
+              <span class="meeting-time">8:00am - 9:15am</span>
+              <span class="meeting-loc">HELD 200</span>
+            </li>
+            <li class="meeting">
+              <span class="meeting-type">Lab</span>
+              <span class="meeting-days">W</span>
+              <span class="meeting-time">3:00pm - 4:50pm</span>
+              <span class="meeting-loc">ENPH 130</span>
+            </li>
+          </ul>
+        </article>
+
+        <article class="course-card" data-course="ENGL 210">
+          <div class="course-head">
+            <span class="course-code">ENGL 210</span>
+            <span class="course-title">Technical and Professional Writing</span>
+            <span class="crn">CRN 19002</span>
+          </div>
+          <ul class="meetings">
+            <li class="meeting">
+              <span class="meeting-type">Lecture</span>
+              <span class="meeting-days">MWF</span>
+              <span class="meeting-time">11:30am - 12:20pm</span>
+              <span class="meeting-loc">LAAH 401</span>
+            </li>
+          </ul>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      MOCK page for local demo only — not affiliated with TAMU. Load the ZLP importer
+      extension and click “Import my schedule”.
+    </footer>
+  </body>
+</html>

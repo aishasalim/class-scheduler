@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
+import { findScheduleConflicts, formatScheduleConflictError } from "@/lib/schedule-conflicts";
+import { saveScheduleRows, type SchedulePayloadRow } from "@/lib/save-schedule";
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "participantId required" }, { status: 400 });
     }
     const rs = await db.execute(
-      "SELECT id, participant_id, subject, number, days, start, duration, lab, lab_days, lab_start, lab_duration FROM schedule_rows WHERE participant_id = ? ORDER BY subject, number",
+      "SELECT id, participant_id, subject, number, days, start, duration, lab, lab_days, lab_start, lab_duration, priority FROM schedule_rows WHERE participant_id = ? ORDER BY subject, number, days, start",
       [participantId]
     );
     return NextResponse.json(rs.rows);
@@ -22,30 +24,28 @@ export async function POST(request: NextRequest) {
   try {
     await ensureDb();
     const body = await request.json();
-    const { participantId, rows } = body as { participantId: string; rows: { subject: string; number: string; days: string; start: string; duration: number; lab?: string; labDays?: string; labStart?: string; labDuration?: number }[] };
+    const { participantId, rows } = body as { participantId: string; rows: SchedulePayloadRow[] };
     if (!participantId || !Array.isArray(rows)) {
       return NextResponse.json({ error: "participantId and rows required" }, { status: 400 });
     }
-    await db.execute("DELETE FROM schedule_rows WHERE participant_id = ?", [participantId]);
-    for (const r of rows) {
-      await db.execute({
-        sql: "INSERT INTO schedule_rows (participant_id, subject, number, days, start, duration, lab, lab_days, lab_start, lab_duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        args: [
-          participantId,
-          r.subject,
-          r.number,
-          r.days,
-          r.start,
-          r.duration,
-          r.lab ?? null,
-          r.labDays ?? null,
-          r.labStart ?? null,
-          r.labDuration ?? null,
-        ],
-      });
+
+    const participant = await db.execute("SELECT id FROM participants WHERE id = ?", [participantId]);
+    if (participant.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Participant not found. Log out and sign in again." },
+        { status: 404 }
+      );
     }
-    return NextResponse.json({ ok: true, saved: rows.length });
+
+    const conflicts = findScheduleConflicts(rows);
+    if (conflicts.length > 0) {
+      return NextResponse.json({ error: formatScheduleConflictError(conflicts) }, { status: 400 });
+    }
+
+    const saved = await saveScheduleRows(participantId, rows);
+    return NextResponse.json({ ok: true, saved });
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,145 +1,173 @@
-# ZLP‑Scheduler
+# ZLP Scheduler
 
-A Python CLI tool that helps the Zachry Leadership Program (ZLP) students find viable 100-minute weekly meeting windows 
-given a set of class sections. It detects conflicts, accounts for inseparable lecture+lab bundles, and produces 
-both a terminal summary and an Excel report (heatmap + top meeting-time ranges).
+Scheduling tool for **Zachry Leadership Program (ZLP)** cohorts at Texas A&M. Students share their class schedules; the app finds the best **100‑minute weekly window** when the whole cohort can meet — and shows which classmates would have to re‑register (movable classes) vs. which windows are blocked by protected classes (unmovable).
 
----
+The system has two surfaces:
 
-## Table of Contents
-1. [Purpose](#purpose)
-2. [Design Rationale](#design-rationale)
-3. [Quick Start](#quick-start)
-4. [Spreadsheet Input Format](#spreadsheet-input-format)
-5. [Outputs](#outputs)
+| Surface | Who | What |
+| --- | --- | --- |
+| 🖥️ **Web app** (`web/`) | Facilitators **and** students | Cohort login, add/edit schedule, shared sections, best meeting windows, cohort pulse |
+| 🧩 **Browser extension** (`extension/`) | Students | One‑click import of a TAMU **Aggie Schedule Builder** schedule into the web app |
 
 ---
 
-## Purpose
+## Repository layout
 
-ZLP students often operate under dense course schedules with limited flexibility across sections.
-The ZLP-Scheduler is designed to make these constraints visible and actionable by answering a single, practical question:
-   
-   **_When can a 100-minute cohort meeting fit, and what tradeoffs does each possible time impose?_**
-
-Rather than optimizing for personal preferences, the scheduler only evaluates which meeting times are feasible. It does not rank instructors, honors sections, or convenience; all courses are weighted as equal. Rather, the goal of this script is to simply determine whether and how a meeting time can fit between everyone's course schedules.
-
----
-
-<a id="design-rationale"></a>
-## Design Rationale
-
-Trying every possible combination of courses by hand is tedious, and trying every possible combination of sections across courses quickly becomes exponential in time complexity, which is computationally infeasable. 
-Instead of choosing a full schedule directly, the ZLP-Scheduler evaluates specific 100-minute meeting windows and measures conflicts relative to each window. 
-This avoids a greedy approach where early course selections are locked in and never reevaluated as additional courses introduce new conflicts.
-
-- **Bundled Options**  
-   * Each spreadsheet row is treated as a single option for a course.
-   * An option may include both lecture and lab meetings, which are treated as inseparable.
- 
-- **Cracking-Based Evaluation (Meeting-Centric)**  
-  * The scheduler does not construct a full course schedule or lock in section choices.
-  * For each 100-minute meeting window, courses are allowed to shift between available options when possible.
-  * A course is counted as a conflict only if **every** option overlaps the meeting window.
-  * This approach avoids greedy placement entirely and ensures that meeting times are evaluated independently and fairly.
-
-- **Cracking-Based Reporting**
-  
-   For every 100-minute meeting start time (every 5-minutes Mon-Fri), the report shows:
-   * _Unavoidable Conflicts_: Courses where every option overlaps the meeting block
-   * _Blocked courses_: Courses that remain possible but with reduced option flexibility due to the meeting time
-   * A ranked list of best meeting-time ranges and a **heatmap** of conflict scores
-
-
- - **Scope & Assumptions** 
-   * The scheduler focuses *exclusively* on fitting a single weekly 100-minute cohort meeting.
-   * It does not rank instructors, honors sections, or personal preferences.
-   * Evaluation is based solely on whether a section’s timing preserves viable meeting windows.
-
-   This logic gives a practical view of “best meeting times” even when the schedule is constraint-heavy.
-   
----
-
-<a id="quick-start"></a>
-## Quick Start
-
-**1) Clone**
-```bash
-git clone https://github.com/stephen122204/ZLP-Scheduler.git
-cd ZLP-Scheduler
 ```
-**2) Install Dependencies**
-```bash
-python -m pip install pandas openpyxl
+ZLP-Scheduler/
+├── web/                       # Next.js 16 app (App Router) — the main app
+│   ├── src/app/               # pages + API routes
+│   │   ├── page.tsx           # landing: pick / create a cohort
+│   │   ├── c/[cohort]/        # cohort workspace + login
+│   │   └── api/               # REST endpoints (see API reference)
+│   ├── src/lib/               # core logic (DB, scheduling algorithm, parsers)
+│   └── src/components/        # UI (shadcn/ui + workspace shell, week grid)
+├── extension/                 # Manifest V3 browser extension (see extension/README.md)
+│   ├── manifest.json
+│   ├── config.js              # ⭐ endpoint URL + Aggie Schedule Builder selectors
+│   ├── content.js             # schedule extraction
+│   ├── popup.js / popup.html  # identity + import UI
+│   └── mock/                  # offline demo schedule page
+└── README.md
 ```
-**3) Add Your Spreadsheet**
 
-Place your input file in the same folder as `zlp_scheduler.py`:
-- `sections.xlsx` (default)
-- or `.xls` / `.csv`
+---
 
-**Note:** If a file named `sections.xlsx` is not found, the terminal interface will prompt you to enter the name of the spreadsheet to load.
+## Quick start (web app)
 
-**4) Run**
 ```bash
-python zlp_scheduler.py
+cd web
+npm install
+npm run dev
 ```
-**Note:** If no spreadsheet is found or provided, the script exits (manual entry has been removed).
+
+Open **http://localhost:3000** → choose **Cohort K** → pick your name from the roster.
+
+Build for production:
+
+```bash
+npm run build && npm start
+```
+
+### Environment
+
+Schedules persist to **SQLite** by default — a local file at `web/.data/zlp.db`, created automatically. To use a hosted **Turso** database instead, set these in `web/.env.local`:
+
+```bash
+# web/.env.local — optional; omit entirely to use the local SQLite file
+TURSO_DATABASE_URL=libsql://your-db.turso.io
+TURSO_AUTH_TOKEN=...
+```
+
+The schema is created/migrated on first request (`ensureDb()`), and **Cohort K is seeded automatically**. No manual migration step.
 
 ---
 
-<a id="spreadsheet-input-format"></a>
-## Spreadsheet Input Format
+## How it works — the 100‑minute window
 
-*Note:* A sample template is included in this repository titled `sections.xlsx`.
+The scheduling logic lives in `web/src/lib/zlpCore.ts` (ported from the original `zlp_scheduler.py`).
 
-**Required Columns (case-sensitive)**
-|  Column  | Example |                Notes                |
-|----------|---------|-------------------------------------|
-| Subject  | ECEN    | 4-letter subject code               |
-| Number   | 214     | may include trailing L (e.g., 214L) |
-| Days     | MWF, TR | any combo of M, T, W, R, F          |
-| Start    | 09:10   | 24-hour HH:MM format                |
-| Duration | 50      | minutes                             |
-
-
-**Optional Lab Bundling Columns (recommended for lecture+lab courses)**
-
-If your course has a lab that must be taken with the lecture, include these columns:
-
-|    Column     | Example |              Notes              |
-|---------------|---------|---------------------------------|
-| Lab           | Y       | truthy values: Y, YES, TRUE, 1  |
-| Lab_Days      | R       | required if Lab is truthy       |
-| Lab_Start     | 15:00   | required if Lab is truthy       |
-| Lab_Duration  | 170     | required if Lab is truthy       |
-
-**Interpretation:** Each row becomes one “Option.” If `Lab=Y`, the lecture and lab are treated as an inseparable bundle; if `Lab=N`, blank, or otherwise falsy, the row is treated as a lecture-only option and any lab columns are ignored.
-
-**Important:** Time fields (`Start`, `Lab_Start`) must be entered as **plain text in 24-hour `HH:MM` format** (e.g., `13:30`). Do not use Excel's built-in time formatting, as automatic time objects are not supported.
+- Time is measured in minutes from midnight. The search grid runs **08:00–16:10**, sliding a **100‑minute** block in **5‑minute** steps across each weekday (M–F).
+- For every candidate block on every day, the app scores how many cohort members have a class overlapping it.
+- Each class a student adds is tagged **movable** or **unmovable**:
+  - **Unmovable** 🔒 — a protected class. A cohort window must *never* overlap it; any window that does is disqualified for that student.
+  - **Movable** 🔓 — the student could re‑register elsewhere. A window may overlap it, counted as a "would re‑register" cost.
+- Windows are ranked: zero overlaps ("everyone free") first, then fewest re‑registers, with windows that block unmovable classes pushed down. The API returns the ranked ranges per day, with the names behind each count.
 
 ---
 
-<a id="outputs"></a>
-## Outputs
+## Web app surfaces
 
-**Terminal Output**
-- Prints a *Top 10* ranked set of top meeting-time ranges (day, start range, and score only)
-- If additional meeting times have **≤ 2 unavoidable conflicts**, all such times are printed, even if this exceeds the top 10
-- Highlights meeting ranges with low unavoidable conflict scores
+### Landing — `/`
+Lists cohorts and lets a facilitator **add a cohort** (code + name + semester) and set its **extension import password**.
 
-**Excel Output**
+### Cohort login — `/c/[cohort]/login`
+Roster search — a student picks their name to enter the workspace. (Cohort K ships with a 31‑student roster.)
 
-Creates `zlp_results.xlsx` containing:
+### Cohort workspace — `/c/[cohort]`
+- **My schedule** — add classes by **pasting** your Aggie *Current Schedule* text (exact, no AI), or **add manually**. Toggle each class **movable / unmovable**.
+- **Your week** — a week grid of your classes plus the **best cohort meeting windows** below it.
+- **Shared sections** — classes you share with classmates (same subject + number); join or leave a section in one click.
+- **Cohort pulse** — live "N/total schedules in" and the current best window.
 
-1. **Heatmap** (rows = start times, columns = weekdays)  
-   Values = number of unavoidable conflicts (score)
-
-2. **Best Meeting-Time Ranges Table** including:
-   - Score (unavoidable conflicts)
-   - Conflicting courses
-   - Blocked course count
-   - Blocked courses list
+> **Importing your schedule:** open **Current Schedule** in Aggie Schedule Builder, copy the course rows (the part with CRNs, days, and times), and paste into *My schedule*. A deterministic parser reads exact times — no screenshots, no AI guessing.
 
 ---
-*Happy scheduling! :D* 
+
+## API reference
+
+All routes live under `web/src/app/api`. Cohort is passed as `?cohort=K` (some accept `?cohortId=K`).
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/cohorts` | List cohorts (id, name, semesters, participant count). Never returns passwords. |
+| `POST` | `/api/cohorts` | Create a cohort (`{ id, name, semester, password? }`). |
+| `PATCH` | `/api/cohorts` | Update a cohort's `semesters`, `currentSemester`, and/or `password`. |
+| `GET` | `/api/participants?cohort=K` | Cohort roster. |
+| `POST` | `/api/participants` | Add a participant. |
+| `GET` | `/api/schedule?participantId=…` | A participant's schedule rows. |
+| `POST` | `/api/schedule` | Save a participant's schedule rows. |
+| `GET` | `/api/schedule/all?cohort=K` | All schedules in a cohort. |
+| `GET` | `/api/cohort/courses?cohort=K` | Shared sections (who's in what). |
+| `GET` | `/api/cohort/stats?cohort=K` | `{ total, submitted }`. |
+| `GET` | `/api/meeting-times?cohort=K` | Ranked best 100‑min windows per day. |
+| `POST` | `/api/actions/parse-schedule-text` | Parse pasted Aggie *Current Schedule* text into normalized rows. |
+| `POST` / `OPTIONS` | `/api/actions/import` | Extension entry point — auth + upsert + normalize + conflict‑check + save (CORS‑enabled). |
+| `GET` | `/api/init` · `POST` `/api/seed` · `POST` `/api/reset` | DB init / seed roster / reset (admin/dev). |
+
+### Extension import contract — `POST /api/actions/import`
+
+```jsonc
+{
+  "cohortId": "K",
+  "fullName": "Jane Doe",
+  "password": "cohort-secret",
+  "priorities": { "CSCE 313": "unmovable", "MATH 251": "movable" },
+  "meetings": [
+    { "subject": "CSCE", "number": "313", "days": "TR", "start": "12:45", "end": "14:00", "duration": 75, "meetingType": "lecture" }
+  ]
+}
+```
+
+Success → `{ ok: true, participantId, rows, saved, courses, conflicts: [] }` · wrong password → **401** · schedule conflicts → **400** with `warning` + `conflicts`.
+
+---
+
+## Data model
+
+SQLite/Turso, three tables (auto‑created and migrated in `web/src/lib/db.ts`):
+
+- **`cohorts`** — `id` (PK, e.g. `K`), `name`, `semester` (JSON array), `current_semester`, `password` (import password), `created_at`.
+- **`participants`** — `id` (PK), `cohort_id`, `name`, `major`, `gender`, `birthday`, `phone`.
+- **`schedule_rows`** — `id`, `participant_id` (FK), `subject`, `number`, `days`, `start`, `duration`, optional `lab`/`lab_days`/`lab_start`/`lab_duration`, `priority` (`movable` | `unmovable`).
+
+---
+
+## Student extension
+
+A Manifest V3 extension that imports a schedule straight from **Aggie Schedule Builder** into the web app. Full setup, demo, and "adapting to the real site" notes are in **[`extension/README.md`](extension/README.md)**.
+
+**Student flow:** facilitator sets a cohort **import password** → student installs the extension, enters name + cohort code + password → opens Aggie Schedule Builder → **Import my schedule** → toggles movable/unmovable per class.
+
+### Run in dev — Chrome (fastest)
+1. `chrome://extensions` → enable **Developer mode**.
+2. **Load unpacked** → select the `extension/` folder.
+3. For the bundled mock page on disk: **Details** → enable **Allow access to file URLs**.
+
+### Run in dev — Safari
+Safari needs the extension wrapped as a native **Safari Web Extension**, which requires **full Xcode** (the Command Line Tools alone are not enough):
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+xcrun safari-web-extension-converter extension/   # generates an Xcode project
+```
+
+Open the generated project, **Build & Run**, then in Safari: **Settings → Advanced → Show features for web developers**, **Develop → Allow Unsigned Extensions** (resets each launch), and enable the extension under **Settings → Extensions**.
+
+> The extension is identical across browsers — for day‑to‑day development, Chrome's "Load unpacked" is the lowest‑friction loop.
+
+---
+
+## Tech stack
+
+Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4 + shadcn/ui · SQLite / Turso via `@libsql/client` · Manifest V3 browser extension.

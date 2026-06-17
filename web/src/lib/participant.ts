@@ -1,8 +1,9 @@
 "use client";
 
-const STORAGE_KEY = "zlp_participant";
+const STORAGE_KEY = "zlp_session";
 
 export type StoredParticipant = {
+  cohortId: string;
   id: string;
   name: string;
 };
